@@ -1,0 +1,271 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Financial Records{% endblock %}
+{% block page_title %}Financial Records{% endblock %}
+
+{% block content %}
+
+<!-- ================= HEADER ================= -->
+<div class="page-header">
+    <div>
+        <h2>Financial Records</h2>
+        <p>Track income and expenses efficiently</p>
+    </div>
+
+    <button class="btn-primary" id="addRecordBtn">
+        <i class="fas fa-plus"></i> Add Record
+    </button>
+</div>
+
+<!-- ================= FILTER ================= -->
+<div class="card filter-card">
+    <form method="GET" class="filter-bar">
+
+        <select name="type">
+            <option value="">All Types</option>
+            <option value="INCOME">Income</option>
+            <option value="EXPENSE">Expense</option>
+        </select>
+
+        <input type="text" name="category" placeholder="Search category...">
+
+        <button type="submit" class="btn-primary">
+            <i class="fas fa-filter"></i> Filter
+        </button>
+
+    </form>
+</div>
+
+<!-- ================= TABLE ================= -->
+<div class="card table-card">
+<table class="user-table">
+    <thead>
+        <tr>
+            <th>Amount</th>
+            <th>Type</th>
+            <th>Category</th>
+            <th>Date</th>
+            <th>Notes</th>
+            <th style="width:150px;">Actions</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for r in records %}
+        <tr>
+
+            <td class="amount">₹{{ r.amount }}</td>
+
+            <td>
+                <span class="badge {{ r.type|lower }}">
+                    {{ r.type }}
+                </span>
+            </td>
+
+            <td>{{ r.category }}</td>
+            <td>{{ r.record_date }}</td>
+
+            <td class="notes">
+                {{ r.notes or "-" }}
+            </td>
+
+            <td>
+                <div class="action-group">
+
+                    <button class="action-btn edit-btn"
+                            title="Edit"
+                            data-id="{{ r.id }}"
+                            data-amount="{{ r.amount }}"
+                            data-type="{{ r.type }}"
+                            data-category="{{ r.category }}"
+                            data-date="{{ r.record_date }}"
+                            data-notes="{{ r.notes }}">
+                        <i class="fas fa-pen"></i>
+                    </button>
+
+                    <a href="{{ url_for('financial.delete_record', id=r.id) }}"
+                       class="action-btn delete-btn"
+                       title="Delete"
+                       onclick="return confirm('Delete record?')">
+                        <i class="fas fa-trash"></i>
+                    </a>
+
+                </div>
+            </td>
+
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<!-- ================= MODAL ================= -->
+<div id="recordModal" class="modal">
+    <div class="modal-content">
+
+        <h3 id="modalTitle">Add Record</h3>
+
+        <form id="recordForm" method="POST">
+
+            <!-- AMOUNT -->
+            <div class="form-group">
+                <label>Amount</label>
+                <input type="number" step="0.01" name="amount" data-error="amountError">
+                <div id="amountError" class="error"></div>
+            </div>
+
+            <!-- TYPE -->
+            <div class="form-group">
+                <label>Type</label>
+                <select name="type" data-error="typeError">
+                    <option value="">Select Type</option>
+                    <option value="INCOME">Income</option>
+                    <option value="EXPENSE">Expense</option>
+                </select>
+                <div id="typeError" class="error"></div>
+            </div>
+
+            <!-- CATEGORY -->
+            <div class="form-group">
+                <label>Category</label>
+                <input type="text" name="category" data-error="categoryError">
+                <div id="categoryError" class="error"></div>
+            </div>
+
+            <!-- DATE -->
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" name="record_date" data-error="dateError">
+                <div id="dateError" class="error"></div>
+            </div>
+
+            <!-- NOTES -->
+            <div class="form-group">
+                <label>Notes</label>
+                <textarea name="notes"></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn-primary">Save</button>
+                <button type="button" id="closeModalBtn" class="btn-secondary">Cancel</button>
+            </div>
+
+        </form>
+
+    </div>
+</div>
+
+<!-- ================= STYLES ================= -->
+<style>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.filter-card { margin-bottom: 20px; }
+
+.filter-bar {
+    display: flex;
+    gap: 10px;
+}
+
+.table-card { padding: 0; }
+
+.badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+
+.badge.income {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.badge.expense {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.form-group { margin-bottom: 12px; }
+
+.error {
+    font-size: 12px;
+    color: red;
+}
+</style>
+
+<!-- ================= JS ================= -->
+<script type="module">
+import FormValidator from "/static/validator/formValidator.js";
+import MessageService from "/static/toast_alert_loading/messageService.js";
+import Loader from "/static/toast_alert_loading/loader.js";
+
+const form = document.getElementById("recordForm");
+const modal = document.getElementById("recordModal");
+
+/* VALIDATION */
+FormValidator.init(form, {
+    amount: { rules: [{ type: "required" }, { type: "number" }] },
+    type: { rules: [{ type: "required" }] },
+    category: { rules: [{ type: "required" }] },
+    record_date: { rules: [{ type: "required" }] }
+});
+
+/* SUBMIT */
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    let valid = true;
+
+    for (const field in FormValidator.config) {
+        const input = form.querySelector(`[name="${field}"]`);
+        const isValid = await FormValidator.validateField(input, FormValidator.config[field]);
+        if (!isValid) valid = false;
+    }
+
+    if (!valid) {
+        MessageService.error("Fix validation errors");
+        return;
+    }
+
+    Loader.show();
+    modal.style.display = "none";
+
+    setTimeout(() => {
+        form.submit();
+    }, 100);
+});
+
+/* ADD */
+document.getElementById("addRecordBtn").onclick = () => {
+    form.action = "/admin/financial/add";
+    form.reset();
+    modal.style.display = "flex";
+};
+
+
+/* EDIT */
+document.querySelectorAll(".edit-btn").forEach(btn => {
+    btn.onclick = () => {
+        form.action = "/admin/financial/update/" + btn.dataset.id;
+
+        form.amount.value = btn.dataset.amount;
+        form.type.value = btn.dataset.type?.toUpperCase();
+        form.category.value = btn.dataset.category;
+        form.record_date.value = btn.dataset.date;
+        form.notes.value = btn.dataset.notes;
+
+        modal.style.display = "flex";
+    };
+});
+
+/* CLOSE */
+document.getElementById("closeModalBtn").onclick = () => {
+    modal.style.display = "none";
+};
+</script>
+
+{% endblock %}

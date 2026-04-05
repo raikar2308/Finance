@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Finance Admin Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+
+  <style>
+    .admin-body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #2C003E, #4A0E4E);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Outfit', sans-serif;
+    }
+
+   .admin-login-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 18px;
+  padding: 42px 36px;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.35);
+}
+
+    .admin-logo {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .admin-logo i {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f3e2b7, #C5A059);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .admin-logo span {
+      font-family: 'Cinzel';
+      font-weight: 700;
+      font-size: 20px;
+    }
+
+    .admin-form-group {
+    margin-bottom: 18px;
+}
+
+.admin-form-group input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    font-size: 14px;
+    background: #f9fafb;
+    transition: all 0.2s ease;
+
+    box-sizing: border-box;
+    display: block;
+}
+
+/* Focus effect */
+.admin-form-group input:focus {
+    outline: none;
+    border-color: #7c3aed;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+}
+
+
+/* Button */
+.admin-login-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(135deg, #4A0E4E, #2C003E);
+    color: #fff;
+    font-weight: 600;
+    margin-top: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.admin-login-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+}
+
+.error {
+  font-size: 12px;
+  color: #dc2626;
+  margin-top: 4px;
+  margin-left: 2px;
+}
+
+
+  </style>
+</head>
+
+<body class="admin-body">
+
+<div class="admin-login-card">
+
+  <!-- Logo -->
+  <div class="admin-logo">
+    <i class="fas fa-shield-halved"></i>
+    <span>Finance</span>
+  </div>
+
+  <!-- Alerts -->
+  <div id="alert-container"></div>
+
+  <!-- Flask Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <script>
+        window.FLASH_MESSAGES = {{ messages|tojson }};
+      </script>
+    {% endif %}
+  {% endwith %}
+
+  <!-- RESET MODE FLAG -->
+  <script>
+    window.RESET_MODE = {{ 'true' if reset_mode else 'false' }};
+  </script>
+
+  <!-- Form -->
+  <form method="POST" action="{{ url_for('admin_login.admin_login') }}" id="loginForm">
+
+    {% if reset_mode %}
+
+      <!--  RESET PASSWORD MODE -->
+      <div class="admin-form-group">
+  <input type="password" name="new_password" placeholder="New Password"
+         data-error="newPasswordError">
+  <div id="newPasswordError" class="error"></div>
+</div>
+
+<div class="admin-form-group">
+  <input type="password" name="confirm_password" placeholder="Confirm Password"
+         data-error="confirmPasswordError">
+  <div id="confirmPasswordError" class="error"></div>
+</div>
+
+      <button type="submit" class="admin-login-btn">
+        Update Password
+      </button>
+
+      <p style="text-align:center; margin-top:10px;">
+        <a href="{{ url_for('admin_login.skip_password') }}">Skip for now</a>
+      </p>
+
+    {% else %}
+
+      <!-- LOGIN MODE -->
+      <div class="admin-form-group">
+        <input type="email" name="email" placeholder="Email"
+               data-error="emailError">
+        <div id="emailError" class="error"></div>
+      </div>
+
+      <div class="admin-form-group">
+        <input type="password" name="password" placeholder="Password"
+               data-error="passwordError">
+        <div id="passwordError" class="error"></div>
+      </div>
+
+      <button type="submit" class="admin-login-btn">
+        Secure Login
+      </button>
+
+    {% endif %}
+
+  </form>
+
+</div>
+
+<!-- Loader -->
+<div id="global-loader">
+  <div class="spinner"></div>
+</div>
+
+
+<script type="module">
+import FormValidator from "/static/validator/formValidator.js";
+import MessageService from "/static/toast_alert_loading/messageService.js";
+import Loader from "/static/toast_alert_loading/loader.js";
+
+const form = document.getElementById("loginForm");
+
+/* ================= VALIDATOR ================= */
+if (window.RESET_MODE) {
+
+  FormValidator.init(form, {
+    new_password: {
+      rules: [
+        { type: "required" },
+        { type: "minLength", value: 6 }
+      ]
+    },
+    confirm_password: {
+      rules: [
+        { type: "required" }
+      ]
+    }
+  });
+
+} else {
+
+  FormValidator.init(form, {
+    email: {
+      rules: [
+        { type: "required" },
+        { type: "email" }
+      ]
+    },
+    password: {
+      rules: [
+        { type: "required" },
+        { type: "minLength", value: 6 }
+      ]
+    }
+  });
+
+}
+
+/* ================= FLASH ================= */
+if (window.FLASH_MESSAGES) {
+  window.FLASH_MESSAGES.forEach(([type, msg]) => {
+    MessageService[type] ? MessageService[type](msg) : MessageService.info(msg);
+  });
+}
+
+/* ================= SUBMIT ================= */
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  Loader.show();
+
+  let valid = true;
+
+  for (const field in FormValidator.config) {
+    const input = form.querySelector(`[name="${field}"]`);
+    const isValid = await FormValidator.validateField(input, FormValidator.config[field]);
+    if (!isValid) valid = false;
+  }
+
+  if (!valid) {
+    Loader.hide();
+    MessageService.error("Fix validation errors");
+    return;
+  }
+
+  form.submit();
+});
+</script>
+
+</body>
+</html>

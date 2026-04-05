@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Finance Admin{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Global CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+
+<body>
+
+<div class="layout">
+
+    <!-- SIDEBAR -->
+   <aside class="sidebar">
+
+    <h2>
+        <i class="fas fa-shield-halved"></i>
+        Finance
+    </h2>
+
+    <!-- DASHBOARD (ALL) -->
+    <a href="{{ url_for('admin_dashboard.dashboard') }}" class="nav-link">
+        <i class="fas fa-chart-line"></i> Dashboard
+    </a>
+
+    <!-- FINANCIAL (ADMIN + ANALYST) -->
+    {% if session.get('role') in ['admin', 'analyst'] %}
+    <a href="{{ url_for('financial.list_records') }}" class="nav-link">
+        <i class="fas fa-wallet"></i> Financial
+    </a>
+    {% endif %}
+
+    <!-- USERS (ADMIN ONLY) -->
+    {% if session.get('role') == 'admin' %}
+    <a href="{{ url_for('users.list_users') }}" class="nav-link">
+        <i class="fas fa-users"></i> Users
+    </a>
+    {% endif %}
+
+</aside>
+
+    <!-- MAIN -->
+    <div class="main">
+
+        <!-- HEADER -->
+        <div class="header">
+            <strong>{% block page_title %}Dashboard{% endblock %}</strong>
+
+            <div class="user">
+                <span>{{ session.get('role')|capitalize }}</span>
+                <button onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <!-- ALERT -->
+        <div id="alert-container"></div>
+
+        <!-- FLASH -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <script>
+            window.FLASH_MESSAGES = {{ messages | tojson }};
+        </script>
+        {% endif %}
+        {% endwith %}
+
+        <!-- CONTENT -->
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            © 2026 Finance • Enterprise Admin Panel
+        </div>
+
+    </div>
+
+</div>
+
+<!-- LOADER -->
+<div id="global-loader">
+    <div class="spinner"></div>
+</div>
+
+<script type="module">
+import MessageService from "/static/toast_alert_loading/messageService.js";
+import Loader from "/static/toast_alert_loading/loader.js";
+
+/* FLASH */
+if (window.FLASH_MESSAGES) {
+    window.FLASH_MESSAGES.forEach(([type, msg]) => {
+        MessageService[type] ? MessageService[type](msg) : MessageService.info(msg);
+    });
+}
+
+/* LOGOUT */
+window.logout = function () {
+    Loader.show();
+    window.location.href = "{{ url_for('admin_login.admin_logout') }}";
+};
+
+/* ACTIVE LINK */
+document.querySelectorAll(".nav-link").forEach(link => {
+    if (link.href === window.location.href) {
+        link.classList.add("active");
+    }
+});
+</script>
+
+</body>
+</html>

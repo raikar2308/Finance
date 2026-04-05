@@ -1,0 +1,272 @@
+{% extends "admin/base.html" %}
+
+{% block title %}User Management{% endblock %}
+{% block page_title %}User Management{% endblock %}
+
+{% block content %}
+
+<div class="card-header">
+    <h3>Users</h3>
+    <button class="btn-primary" id="addUserBtn">+ Add User</button>
+</div>
+
+<table class="user-table">
+    <thead>
+        <tr>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th style="width:180px;">Actions</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.email }}</td>
+            <td>{{ u.role }}</td>
+
+            <td>
+                <span class="status {{ u.status|lower }}">{{ u.status }}</span>
+            </td>
+
+           <td>
+    <div class="action-group">
+
+        <!-- EDIT -->
+        <button class="action-btn edit-btn"
+                title="Edit User"
+                data-id="{{ u.id }}"
+                data-email="{{ u.email }}"
+                data-role="{{ u.role }}">
+            ✏️
+        </button>
+
+        <!-- TOGGLE -->
+        <a href="{{ url_for('users.toggle_status', user_id=u.id) }}"
+           class="action-btn toggle-btn"
+           title="Toggle Status">
+            🔄
+        </a>
+
+        <!-- DELETE -->
+        <a href="{{ url_for('users.delete_user', user_id=u.id) }}"
+           class="action-btn delete-btn"
+           title="Delete User"
+           onclick="return confirm('Delete user?')">
+            🗑️
+        </a>
+
+    </div>
+</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+
+<!-- ================= MODAL ================= -->
+<div id="userModal" class="modal">
+    <div class="modal-content">
+
+        <h3 id="modalTitle">Add User</h3>
+
+        <form id="userForm" method="POST">
+
+            <input type="email"
+       name="email"
+       id="email"
+       placeholder="Enter user email"
+       data-error="emailError">
+
+
+<select name="role" id="role" data-error="roleError">
+    <option value="">Select user role</option>
+    <option value="admin">Admin</option>
+    <option value="analyst">Analyst</option>
+    <option value="viewer">Viewer</option>
+</select>
+
+
+
+
+
+
+            <div class="modal-actions">
+                <button type="submit" class="btn-primary">Save</button>
+                <button type="button" class="btn-secondary" id="closeModalBtn">Cancel</button>
+            </div>
+
+        </form>
+
+    </div>
+</div>
+
+
+<style>
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+
+
+.btn-edit {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.btn-toggle {
+    margin: 0 6px;
+    color: #555;
+}
+
+.btn-delete {
+    color: #dc2626;
+}
+
+.user-table {
+    width: 100%;
+    background: #fff;
+    border-radius: 12px;
+}
+
+.user-table th, .user-table td {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.status.active { color: #16a34a; font-weight: 600; }
+.status.blocked { color: #dc2626; font-weight: 600; }
+
+</style>
+
+
+<script type="module">
+let originalEmail = null;
+window.originalEmail = null;
+let isEditing = false;
+
+import FormValidator from "/static/validator/formValidator.js";
+import MessageService from "/static/toast_alert_loading/messageService.js";
+import Loader from "/static/toast_alert_loading/loader.js";
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const form = document.getElementById("userForm");
+    const modal = document.getElementById("userModal");
+
+    /* ================= VALIDATOR ================= */
+    FormValidator.init(form, {
+        email: {
+            rules: [
+                { type: "required" },
+                { type: "email" },
+                { async: "emailAvailable" }
+            ]
+        },
+        role: {
+            rules: [
+                { type: "required" }
+            ]
+        }
+    });
+
+    /* ================= FLASH ================= */
+    if (window.FLASH_MESSAGES) {
+        window.FLASH_MESSAGES.forEach(([type, msg]) => {
+            MessageService[type]?.(msg);
+        });
+    }
+
+    /* ================= SUBMIT ================= */
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        let valid = true;
+
+        for (const field in FormValidator.config) {
+            const input = form.querySelector(`[name="${field}"]`);
+            const isValid = await FormValidator.validateField(input, FormValidator.config[field]);
+            if (!isValid) valid = false;
+        }
+
+        if (!valid) {
+            MessageService.error("Fix validation errors");
+            return;
+        }
+
+        Loader.show();
+
+        modal.style.display = "none";
+
+        setTimeout(() => {
+            form.submit();
+        }, 100);
+    });
+
+    /* ================= ADD ================= */
+    document.getElementById("addUserBtn").addEventListener("click", () => {
+        document.getElementById("modalTitle").innerText = "Add User";
+        form.action = "{{ url_for('users.add_user') }}";
+
+        originalEmail = null;
+        window.originalEmail = null;
+        isEditing = false;
+
+        form.reset();
+        clearErrors();
+
+        modal.style.display = "flex";
+    });
+
+    /* ================= EDIT ================= */
+    document.querySelectorAll(".edit-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+
+            isEditing = true;
+
+            const id = btn.dataset.id;
+            const email = btn.dataset.email;
+            const role = btn.dataset.role;
+
+            originalEmail = email;
+            window.originalEmail = email;
+
+            document.getElementById("modalTitle").innerText = "Edit User";
+            form.action = "/admin/users/update/" + id;
+
+            document.getElementById("email").value = email;
+            document.getElementById("role").value = role;
+
+            clearErrors();
+
+            modal.style.display = "flex";
+        });
+    });
+
+    /* ================= CLOSE ================= */
+    document.getElementById("closeModalBtn").addEventListener("click", () => {
+        modal.style.display = "none";
+    });
+
+    /* ================= OUTSIDE CLICK ================= */
+    window.addEventListener("click", (e) => {
+        if (e.target.classList.contains("modal")) {
+            modal.style.display = "none";
+        }
+    });
+
+    function clearErrors() {
+        document.querySelectorAll(".error").forEach(el => el.innerText = "");
+    }
+
+});
+</script>
+
+{% endblock %}
